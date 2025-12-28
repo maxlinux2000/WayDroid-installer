@@ -1,20 +1,4 @@
 #!/bin/bash
-# create_waydroid_run.sh
-# Genera el archivo ejecutable one-click 'waydroid_installer.run' (SOLO TERMINAL)
-
-DATE=$(date '+%Y-%m-%d')
-
-set -e
-
-OUTPUT_FILE="waydroid_installer_$DATE.run"
-
-echo "🛠️ Generando el instalador auto-extraíble: $OUTPUT_FILE (SOLO TERMINAL y Launcher de Reinicio)"
-
-# -----------------------------------------------------------------------------
-# 1. Crear el Wrapper de Inicio
-# -----------------------------------------------------------------------------
-cat > "$OUTPUT_FILE" << 'EOF_WRAPPER'
-#!/bin/bash
 # Waydroid Installer - Script auto-extraíble
 # -----------------------------------------------------------------------------
 set -e
@@ -61,12 +45,6 @@ rm -rf "$TMP_DIR"
 exit $?
 
 # --- PAYLOAD START ---
-EOF_WRAPPER
-
-# -----------------------------------------------------------------------------
-# 2. Adjuntar el Payload de Instalación (SOLO TERMINAL)
-# -----------------------------------------------------------------------------
-cat >> "$OUTPUT_FILE" << 'EOF_PAYLOAD_MODIFIED'
 #!/bin/bash
 # Script de instalación de Waydroid (Payload interno - SOLO TERMINAL)
 # -----------------------------------------------------------------------------
@@ -337,12 +315,3 @@ else
 fi
 
 exit 0
-EOF_PAYLOAD_MODIFIED
-
-# 3. Dar permisos de ejecución al instalador final
-chmod +x "$OUTPUT_FILE"
-
-echo "---"
-echo "✅ Generación finalizada. El archivo listo para distribuir es: $OUTPUT_FILE"
-echo "Para usarlo, ejecute: ./$OUTPUT_FILE (se encargará de todo en la terminal)."
-

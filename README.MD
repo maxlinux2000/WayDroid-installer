@@ -222,6 +222,13 @@ echo "---"
 
 
 # -----------------------------------------------------------------------------
+# 3.1 Instalación de python3-pyclipper para que funcione el copy/paste
+#     entre waydroid y linux
+# -----------------------------------------------------------------------------
+
+apt install -t python3-pyclipper
+
+# -----------------------------------------------------------------------------
 # 4. Configuración y Activación del Firewall (UFW)
 # -----------------------------------------------------------------------------
 echo "[4/7] Configurando firewall UFW..."
