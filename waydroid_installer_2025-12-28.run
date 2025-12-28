@@ -52,8 +52,11 @@ set -e
 
 HELPER_SCRIPT_PATH="/usr/local/bin/waydroid-gservices-helper.sh"
 RESTART_SCRIPT_PATH="/usr/local/bin/waydroid-restart.sh"
+APK_INSTALLER_PATH="/usr/local/bin/waydroid-apk-installer.sh"
 DESKTOP_ACTIVATOR_PATH="/usr/share/applications/Waydroid_Gplay_Activator.desktop"
 DESKTOP_RESTART_PATH="/usr/share/applications/Waydroid_Restart.desktop"
+DESKTOP_APK_INSTALLER_PATH="/usr/share/applications/Waydroid_APK_Installer.desktop"
+
 
 # Obtener el nombre de usuario del wrapper
 WAYDROID_USER=""
@@ -70,7 +73,7 @@ echo "---"
 # -----------------------------------------------------------------------------
 # 0. Verificación de Compatibilidad
 # -----------------------------------------------------------------------------
-echo "[0/7] Verificando la compatibilidad del sistema operativo..."
+echo "[0/9] Verificando la compatibilidad del sistema operativo..."
 
 if [ -f /etc/os-release ]; then
     . /etc/os-release
@@ -96,11 +99,12 @@ echo "---"
 
 
 # -----------------------------------------------------------------------------
-# 1. Instalación de Pre-requisitos
+# 1. Instalación de Pre-requisitos (Añadimos YAD)
 # -----------------------------------------------------------------------------
-echo "[1/7] Instalando paquetes pre-requisitos: curl, ca-certificates, ufw..."
+echo "[1/9] Instalando paquetes pre-requisitos: curl, ca-certificates, ufw, yad..."
 apt update
-if ! apt install curl ca-certificates ufw -y; then
+# Se añade YAD para el instalador de APK
+if ! apt install curl ca-certificates ufw yad -y; then
     echo "❌ Error al instalar paquetes base."
     exit 1
 fi
@@ -112,7 +116,7 @@ echo "---"
 # 2. Añadir el Repositorio Oficial de Waydroid
 # -----------------------------------------------------------------------------
 WAYDROID_DISTRO_ARG="bookworm"
-echo "[2/7] Añadiendo el repositorio oficial de Waydroid (forzando '$WAYDROID_DISTRO_ARG')..."
+echo "[2/9] Añadiendo el repositorio oficial de Waydroid (forzando '$WAYDROID_DISTRO_ARG')..."
 if ! curl -s https://repo.waydro.id | bash -s "$WAYDROID_DISTRO_ARG"; then
     echo "❌ Error al añadir el repositorio de Waydroid."
     exit 1
@@ -125,7 +129,7 @@ echo "---"
 # -----------------------------------------------------------------------------
 # 3. Instalación de Waydroid
 # -----------------------------------------------------------------------------
-echo "[3/7] Instalando Waydroid..."
+echo "[3/9] Instalando Waydroid..."
 if ! apt install waydroid -y; then
     echo "❌ Error al instalar el paquete 'waydroid'."
     exit 1
@@ -137,13 +141,17 @@ echo "---"
 # 3.1 Instalación de python3-pyclipper para que funcione el copy/paste
 #     entre waydroid y linux
 # -----------------------------------------------------------------------------
-
-apt install -t python3-pyclipper
+echo "[4/9] Instalando python3-pyclipper para portapapeles (clipboard)..."
+if ! apt install python3-pyclipper -y; then
+    echo "⚠️ Advertencia: Error al instalar python3-pyclipper. El portapapeles podría no funcionar."
+fi
+echo "✅ python3-pyclipper instalado (si estaba disponible)."
+echo "---"
 
 # -----------------------------------------------------------------------------
 # 4. Configuración y Activación del Firewall (UFW)
 # -----------------------------------------------------------------------------
-echo "[4/7] Configurando firewall UFW..."
+echo "[5/9] Configurando firewall UFW..."
 ufw allow 53/udp
 ufw allow 53/tcp
 ufw allow 67/udp
@@ -159,7 +167,7 @@ echo "---"
 # -----------------------------------------------------------------------------
 # 5. Creación del Script Auxiliar de Activación (waydroid-gservices-helper.sh)
 # -----------------------------------------------------------------------------
-echo "[5/7] Creando script auxiliar de activación de Google Play..."
+echo "[6/9] Creando script auxiliar de activación de Google Play..."
 
 # INTEGRACIÓN EXACTA del script proporcionado
 cat > "$HELPER_SCRIPT_PATH" << 'EOF_HELPER'
@@ -201,19 +209,19 @@ echo "Android ID: $ANDROID_ID"
 echo "----------------------------------------------------------------------"
 echo "PASO 2: REGISTRO DE GOOGLE PLAY SERVICES"
 echo "----------------------------------------------------------------------"
-echo "a. Copia la ID de Android que aparece arriba."
-echo "b. Abre el siguiente enlace en tu navegador:"
-echo "		https://www.google.com/android/uncertified"
-echo "c. Pega la ID de Android en el campo de 'Google Services Framework Android ID'."
-echo "d. Presiona 'Register'."
+echo "a. Copie la ID de Android que aparece arriba."
+echo "b. Abra el siguiente enlace en su navegador:"
+echo "   https://www.google.com/android/uncertified"
+echo "c. Pegue la ID de Android en el campo de 'Google Services Framework Android ID'."
+echo "d. Presione 'Register'."
 echo "----------------------------------------------------------------------"
 echo "PASO 3: REINICIAR WAYDROID"
 echo "----------------------------------------------------------------------"
-echo "Después de registrar la ID y esperar unos minutos, usa el lanzador 'Waydroid Restart'."
-echo "Reinicia seleccionando en las Apps Waydroid Restart"
+echo "Después de registrar la ID y esperar unos minutos, reinicie Waydroid."
+echo "Comando para reiniciar: waydroid session stop"
 echo "----------------------------------------------------------------------"
 echo ""
-read -r -p "Presiona [Enter] para finalizar la visualización de este mensaje."
+read -r -p "Presione [Enter] para finalizar la visualización de este mensaje."
 exit 0
 EOF_HELPER
 
@@ -225,7 +233,7 @@ echo "---"
 # -----------------------------------------------------------------------------
 # 6. Creación del Script de Reinicio (waydroid-restart.sh)
 # -----------------------------------------------------------------------------
-echo "[6/7] Creando script de reinicio rápido de Waydroid..."
+echo "[7/9] Creando script de reinicio rápido de Waydroid..."
 
 cat > "$RESTART_SCRIPT_PATH" << 'EOF_RESTART'
 #!/bin/bash
@@ -256,11 +264,53 @@ chmod +x "$RESTART_SCRIPT_PATH"
 echo "✅ Script de reinicio $RESTART_SCRIPT_PATH creado."
 echo "---"
 
+# -----------------------------------------------------------------------------
+# 7. Creación del Script Instalador de APK (waydroid-apk-installer.sh)
+# -----------------------------------------------------------------------------
+echo "[8/9] Creando script instalador de APKs (usando YAD)..."
+
+cat > "$APK_INSTALLER_PATH" << 'EOF_APK_INSTALLER'
+#!/bin/bash
+# waydroid-apk-installer.sh
+# Abre un diálogo YAD para seleccionar un APK e instalarlo en Waydroid.
+
+clear
+APK_FILE=$(yad --center --title="Seleccionar archivo APK" --text="Seleccione el paquete de aplicación Android (.apk) que desea instalar en Waydroid." --file --class="WayDroidInstaller" --file-filter="Paquetes APK (*.apk)|*.apk" --width=600 --height=400)
+
+# Comprobar si se seleccionó un archivo
+if [ $? -ne 0 ] || [ -z "$APK_FILE" ]; then
+    yad --center --title="Cancelado" --text="Instalación cancelada por el usuario." --button="Aceptar:0" --image="dialog-information"
+    exit 0
+fi
+
+# Intentar instalar
+yad --center --title="Instalando APK" --text="Instalando $APK_FILE... Por favor espere." --progress --pulsate --undecorated &
+PID=$!
+
+INSTALL_OUTPUT=$(waydroid app install "$APK_FILE" 2>&1)
+EXIT_CODE=$?
+
+kill $PID # Detener el diálogo de progreso
+wait $PID 2>/dev/null
+
+if [ $EXIT_CODE -eq 0 ]; then
+    yad --center --title="Instalación Exitosa" --text="El paquete APK ha sido instalado correctamente en Waydroid.\n\n$INSTALL_OUTPUT" --button="Aceptar:0" --image="dialog-ok"
+else
+    yad --center --title="Error de Instalación" --text="Hubo un error al instalar el paquete APK.\n\nSalida del error:\n$INSTALL_OUTPUT" --button="Aceptar:0" --image="dialog-error"
+fi
+
+exit 0
+EOF_APK_INSTALLER
+
+chmod +x "$APK_INSTALLER_PATH"
+echo "✅ Script instalador de APK $APK_INSTALLER_PATH creado."
+echo "---"
+
 
 # -----------------------------------------------------------------------------
-# 7. Creación de Launchers (.desktop)
+# 8. Creación de Launchers (.desktop)
 # -----------------------------------------------------------------------------
-echo "[7/7] Creando lanzadores .desktop..."
+echo "[9/9] Creando lanzadores .desktop..."
 
 # Launcher para el Activador de Google Play (Terminal)
 cat > "$DESKTOP_ACTIVATOR_PATH" << EOF_ACTIVATOR
@@ -292,17 +342,34 @@ Categories=System;
 Keywords=Waydroid;Android;Reiniciar;
 EOF_RESTART_LAUNCHER
 echo "   -> Launcher: $DESKTOP_RESTART_PATH creado."
+
+
+# Launcher para el Instalador de APK
+cat > "$DESKTOP_APK_INSTALLER_PATH" << EOF_APK_LAUNCHER
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=WayDroid APK Installer
+Comment=Instala aplicaciones descargadas desde archivos APK usando una interfaz gráfica simple.
+Exec=$APK_INSTALLER_PATH
+Icon=android
+Terminal=false
+Categories=System;Utility;
+Keywords=Waydroid;Android;APK;Install;
+EOF_APK_LAUNCHER
+echo "   -> Launcher: $DESKTOP_APK_INSTALLER_PATH creado."
+
 echo "✅ Lanzadores .desktop creados."
 echo "---"
 
 
 # -----------------------------------------------------------------------------
-# 8. Finalización
+# 9. Finalización
 # -----------------------------------------------------------------------------
 echo "🎉 [FINALIZADO] Instalación de Waydroid completada."
 echo ""
 echo "❗ IMPORTANTE: Es necesario reiniciar el sistema."
-echo "   Para la activación final de Google Play, use los lanzadores después de reiniciar."
+echo "   Para la activación y uso de APKs, use los lanzadores después de reiniciar."
 echo ""
 read -r -p "¿Desea reiniciar ahora? (s/n): " REBOOT_CHOICE
 
